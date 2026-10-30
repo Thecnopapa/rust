@@ -17,7 +17,6 @@ pub fn read(filepath:String){
             println!("{}", line);
         }
     }
-
 }
 
 
@@ -28,5 +27,4 @@ pub fn parse(filepath:String){
             println!("{}", line);
         }
     }
-
 }

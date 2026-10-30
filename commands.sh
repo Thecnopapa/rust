@@ -7,5 +7,9 @@ run (){
 }
 
 build (){
-    cargo build "$@"
+    maturin develop
+}
+
+test (){
+    python test.py "$@"
 }

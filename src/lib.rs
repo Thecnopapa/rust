@@ -1,15 +1,48 @@
 use pyo3::prelude::*;
 mod base;
 
+use pyo3::types::{PyDict, PyString};
+use pyo3::PyTypeInfo;
+
+#[pyclass()]
+struct MMCIF;
+
+
+#[pymethods]
+impl MMCIF {
+    #[new]
+    #[pyo3(signature = (filepath))]
+    fn __new__(
+        filepath: &Bound<'_, PyString>
+    ) -> PyResult<Self> {
+        Ok(Self)
+    }
+
+    #[pyo3(signature = (filepath))]
+    fn __init__(
+        slf: &Bound<'_, Self>,
+        filepath: &Bound<'_, PyString>
+    ) -> PyResult<()> {
+        Ok(())
+    }
+}
+
 /// Formats the sum of two numbers as string.
 #[pyfunction]
-crate::base::parser::parse;
+fn print(filepath:String) -> PyResult<String> {
+    base::parser::read(filepath.clone());
+    return Ok(filepath.clone())
+}
+
+fn parse(filepath:String) -> PyResult<String> {
+    base::parser::read(filepath.clone());
+    return Ok(filepath.clone())
+}
 
 /// A Python module implemented in Rust.
 #[pymodule]
 fn mmcif_parser(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(crate::base::parser::parse, m)?)?;
-    m.add_function(wrap_pyfunction!(crate::base::parser::read, m)?)?;
-
+    m.add_function(wrap_pyfunction!(print, m)?)?;
+    m.add_class::<MMCIF>()?;
     Ok(())
 }
