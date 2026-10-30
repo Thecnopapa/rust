@@ -1,6 +1,15 @@
 [package]
-name = "rust"
-version = "0.1.0"
+name = "mmcif_parser"
+version = "0.0.1"
 edition = "2024"
 
 [dependencies]
+pyo3 = "0.30.1"
+
+[lib]
+name = "mmcif_parser"
+crate-type = ["cdylib"]
+
+[[bin]]
+name = "mmcif_parser"
+path = "src/main.rs"
