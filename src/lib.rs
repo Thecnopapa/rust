@@ -1,16 +1,15 @@
 use pyo3::prelude::*;
-mod main;
+mod base;
 
 /// Formats the sum of two numbers as string.
 #[pyfunction]
-fn sum_as_string(a: usize, b: usize) -> PyResult<String> {
-    Ok((a + b).to_string())
-}
+crate::base::parser::parse;
 
 /// A Python module implemented in Rust.
 #[pymodule]
-fn string_sum(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(sum_as_string, m)?)?;
+fn mmcif_parser(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(crate::base::parser::parse, m)?)?;
+    m.add_function(wrap_pyfunction!(crate::base::parser::read, m)?)?;
 
     Ok(())
 }

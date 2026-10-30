@@ -10,6 +10,8 @@ pyo3 = "0.30.1"
 name = "mmcif_parser"
 crate-type = ["cdylib"]
 
+
+
 [[bin]]
 name = "mmcif_parser"
 path = "src/main.rs"
