@@ -2,7 +2,6 @@
 use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::Path;
-use std::collections::HashMap;
 use regex::Regex;
 
 
@@ -67,11 +66,20 @@ enum ParsedKey {
     None
 }
 
+#[derive(Debug)]
+enum Literal {
+    Delimiter(String, char),
+    Implicit,
+    None
+}
+
 
 pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>){
     println!("Parsing file: {filepath}");
+    println!("INCLUDE:{:?}", include);
+    println!("EXCLUDE:{:?}", exclude);
     let mut status = Status::Blank;
-    let mut in_literal = false;
+    let mut literal = Literal::None;
     let re = Regex::new(r"  *").unwrap();
     let mut n = 0;
 
@@ -84,104 +92,165 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>){
         for line in lines.map_while(Result::ok) {
             println!("\n{n} ({:?})", status);
             n+=1;
-            if n > 10 {break}
-            let line = re.replace_all(&line, " ");
+            if n > 150 {break}
+            let l0: Vec<&str> = line.split(" ").collect();
+            let l0 = l0[0];
 
-            //println!("{:?}", line);
-            let l: Vec<&str> = line.split(" ").collect();
-            //l.pop();
-            println!("{:?}", l);
+            println!("LITERAL: {literal:?}");
+            println!("LITERAL: {literal:?}");
+            match literal {
+                Literal::Delimiter(_, _) => {
+                    println!("Inside literal: {line}");
+                }, 
+                Literal::Implicit => {
+                    println!("Inside implicit literal: {line}");
+                }, 
+                _ => {
+                    let line = re.replace_all(&line, " ");
 
-            if l.len() == 0 {
-                continue
-            }
-            
-            if l[0].starts_with("data_") {
-                let ll0: Vec<&str> = l.clone()[0].split("_").collect();
-                dataname = ll0[1].to_string();
-                println!("DATANAME:{}", dataname);
-                continue
-            }
+                    //println!("{:?}", line);
+                    let l: Vec<&str> = line.split(" ").collect();
+                    //l.pop();
+                    println!("{:?}", l);
 
-
-            println!(">>{}", l[0]);
-            //println!("{}", l[0] == "loop_");
-            match l[0] {
-                "#" => {
-                    status = Status::Blank;
-                    match current {
-                        ParsedKey::DictKey(_) | ParsedKey::ListKey(_) => {
-                            result.push(current);
-                        },
-                        _ => {}
+                    if l.len() == 0 {
+                        continue
                     }
-                    current = ParsedKey::None;
-                    in_literal = false;
-                    println!("status --> {status:?}");
-                },
-
-                "loop_" => {
-                    status = Status::LoopHeader;
-                    println!("status --> {status:?}");
-                    continue
-
-                },
-                _ => {
-                    match l[0].chars().next() {
-                            Some(c) => {
-                                if c != '_'  {
-                                    if status == Status::LoopHeader {
-                                        status = Status::Loop;
-                                        println!("status --> {status:?}");
-                                    } 
-                                } else if status == Status::Blank {
-                                    status = Status::Dict;
-                                    println!("status --> {status:?}");
-                                }
-                            },
-                            None => {todo!()}
-                        }
                     
-                },
-            }
+                    if l[0].starts_with("data_") {
+                        let ll0: Vec<&str> = l.clone()[0].split("_").collect();
+                        dataname = ll0[1].to_string();
+                        println!("DATANAME:{}", dataname);
+                        continue
+                    }
 
-            println!("Current = {current:?}");
-            match status {
-                Status::Blank => {continue},
-                _ => {
-                    let h: Vec<&str>= l[0].split(".").collect();
-                    let k =  h[0];
-                    let s = h[1];
-                    
 
-                    match current {
-                        ParsedKey::None => {
-                            println!("Building new element");
-
-                            println!("Key = {k}");
-                            match status {
-                                Status::LoopHeader => current = ParsedKey::ListKey(List{key: k.to_string(), val: vec![]}),
-                                Status::Dict => current = ParsedKey::DictKey(Dict{key: k.to_string(), val: vec![]}),
+                    //println!(">>{}", l[0]);
+                    //println!("{}", l[0] == "loop_");
+                    match l[0] {
+                        "#" => {
+                            status = Status::Blank;
+                            match current {
+                                ParsedKey::DictKey(_) | ParsedKey::ListKey(_) => {
+                                    result.push(current);
+                                },
                                 _ => {}
                             }
-                            println!("Current = {current:?}");
+                            current = ParsedKey::None;
+                            literal = Literal::None;
+                            println!("status --> {status:?}");
                         },
-                        _ => {}
+
+                        "loop_" => {
+                            status = Status::LoopHeader;
+                            println!("status --> {status:?}");
+                            continue
+
+                        },
+                        _ => {
+                            match l[0].chars().next() {
+                                Some(c) => {
+                                    if c != '_'  {
+                                        if status == Status::LoopHeader {
+                                            status = Status::Loop;
+                                            println!("status --> {status:?}");
+                                        } 
+                                    } else if status == Status::Blank {
+                                        status = Status::Dict;
+                                        println!("status --> {status:?}");
+                                    }
+                                },
+                                None => {todo!()}
+                            }
+                            
+                        }
                     }
 
                     match status {
                         Status::Dict => {
-                            let v = l[1];
-                            match current {
-                                ParsedKey::DictKey(ref mut d) => {
-                                    d.val.push(DictItem{key: k.to_string(), subkey:s.to_string(), val: v.to_string(),})
-                                },
-                                _ => {}
-
-                            }
+                            if l.len() <= 2{
+                                literal = Literal::Implicit;
+                            } 
                         },
                         _ => {}
                     }
+                }
+            }
+
+
+
+
+            //println!("Current = {current:?}");
+            match status {
+                Status::Blank => {continue},
+                Status::Loop => {continue},
+                Status::LoopHeader |  Status::Dict => {
+                    let h: Vec<&str>= l0.split(".").collect();
+                    let k =  h[0];
+                    match literal {
+                        Literal::None => {
+                            match current {
+                                ParsedKey::None => {
+                                    println!("Building new element");
+                                    println!("Key = {k}");
+                                    match status {
+                                        Status::LoopHeader => current = ParsedKey::ListKey(List{key: k.to_string(), val: vec![]}),
+                                        Status::Dict => current = ParsedKey::DictKey(Dict{key: k.to_string(), val: vec![]}),
+                                        _ => {}
+                                    }
+                                    println!("Current = {current:?}");
+                                },
+                                _ => {}
+                            }
+                        },
+                        Literal::Implicit => {
+                            literal = Literal::Delimiter(String::from(""), line.chars().next().unwrap());
+                        },
+                        Literal::Delimiter(_, _) => {
+
+                        }
+
+                    }
+                    
+                    let mut v = String::from("");
+
+
+                    for c in line.chars() {
+                        match literal{
+                            Literal::Delimiter(ref mut vv, cc) => {
+                                if c == cc {
+                                    println!("LITERAL end");
+                                    break
+                                }
+                                vv.push(c.clone())
+                            },
+                            _ => {
+                                v.push(c.clone());
+                            }
+                        }
+                    }
+                    
+                    
+                    match status {
+                        Status::Dict => {
+                            match current {
+                                ParsedKey::DictKey(ref mut d) => {
+                                    match literal {
+                                        Literal::None | Literal::Implicit => {
+                                            // let h: Vec<&str>= l0.split(".").collect();
+                                            // let k =  h[0];
+                                            let s = h[1];
+                                            d.val.push(DictItem{key: k.to_string(), subkey:s.to_string(), val: v.clone()});
+                                        },
+                                        _ => {}
+
+                                    }
+                                },
+                                _ => {}
+                            }
+                        },
+                        _ => {}
+                    } 
                 }
             }
                 //     match status {
