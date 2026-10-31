@@ -56,7 +56,7 @@ struct List {
 #[derive(PartialEq)]
 struct Dict {
     key: String,
-    val: Vec<ListItem>
+    val: Vec<DictItem>
 }
 
 #[derive(Debug)]
@@ -97,7 +97,7 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>){
             }
             
             if l[0].starts_with("data_") {
-                let ll0: Vec<&str> = l.clone()[0].clone().split("_").collect();
+                let ll0: Vec<&str> = l.clone()[0].split("_").collect();
                 dataname = ll0[1].to_string();
                 println!("DATANAME:{}", dataname);
                 continue
@@ -109,6 +109,12 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>){
             match l[0] {
                 "#" => {
                     status = Status::Blank;
+                    match current {
+                        ParsedKey::DictKey(_) | ParsedKey::ListKey(_) => {
+                            result.push(current);
+                        },
+                        _ => {}
+                    }
                     current = ParsedKey::None;
                     in_literal = false;
                     println!("status --> {status:?}");
@@ -122,14 +128,17 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>){
                 },
                 _ => {
                     match l[0].chars().next() {
-                            Some(c) => if c != '_'  {
-                                if status == Status::LoopHeader {
-                                    status = Status::Loop;
-                                } else {
+                            Some(c) => {
+                                if c != '_'  {
+                                    if status == Status::LoopHeader {
+                                        status = Status::Loop;
+                                        println!("status --> {status:?}");
+                                    } 
+                                } else if status == Status::Blank {
                                     status = Status::Dict;
+                                    println!("status --> {status:?}");
                                 }
-                                
-                                },
+                            },
                             None => {todo!()}
                         }
                     
@@ -139,40 +148,58 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>){
             println!("Current = {current:?}");
             match status {
                 Status::Blank => {continue},
-                Status::LoopHeader => {
-                    println!("In loop header = {current:?}");
+                _ => {
+                    let h: Vec<&str>= l[0].split(".").collect();
+                    let k =  h[0];
+                    let s = h[1];
+                    
+
                     match current {
                         ParsedKey::None => {
-                            println!("Building new List");
-                            let h: Vec<&str>= l[0].split(".").collect();
-                            let k = h[0];
+                            println!("Building new element");
+
                             println!("Key = {k}");
-                            current = ParsedKey::ListKey(List{key: k.to_string(), val: vec![]});
+                            match status {
+                                Status::LoopHeader => current = ParsedKey::ListKey(List{key: k.to_string(), val: vec![]}),
+                                Status::Dict => current = ParsedKey::DictKey(Dict{key: k.to_string(), val: vec![]}),
+                                _ => {}
+                            }
                             println!("Current = {current:?}");
                         },
                         _ => {}
                     }
 
-                },
-                Status::Loop => {
+                    match status {
+                        Status::Dict => {
+                            let v = l[1];
+                            match current {
+                                ParsedKey::DictKey(ref mut d) => {
+                                    d.val.push(DictItem{key: k.to_string(), subkey:s.to_string(), val: v.to_string(),})
+                                },
+                                _ => {}
 
-                },
-                Status::Dict => {
-                    match current {
-                        ParsedKey::None => {
-                            println!("Building new Dict");
-                            let h: Vec<&str>= l[0].split(".").collect();
-                            let k = h[0];
-                            let s = h[1];
-                            println!("Key = {k}");
-                            current = ParsedKey::DictKey(Dict{key: k.to_string(), val: vec![]});
-                            println!("Current = {current:?}");
+                            }
                         },
                         _ => {}
                     }
-
-                },
+                }
             }
+                //     match status {
+                //         Status::LoopHeader => {
+                //             println!("In loop header = {current:?}");
+                            
+                //         },
+                //         Status::Loop => {
+
+                //         },
+                //         Status::Dict => {
+
+                //         //match current.val.push(DictItem{key: k.to_string(),, subkey:s.to_string(),, val: v.to_string(),});
+
+                //         },
+                //         _ => {}
+                //     }
+                // }
         }
     }
     println!("DATANAME:{}", dataname);
