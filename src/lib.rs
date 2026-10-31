@@ -34,15 +34,17 @@ fn print(filepath:String) -> PyResult<String> {
     return Ok(filepath.clone())
 }
 
-fn parse(filepath:String) -> PyResult<String> {
-    base::parser::read(filepath.clone());
-    return Ok(filepath.clone())
+#[pyfunction]
+fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> PyResult<String> {
+    base::parser::parse(filepath.clone(), include.clone(), exclude.clone());
+    return Ok(filepath)
 }
 
 /// A Python module implemented in Rust.
 #[pymodule]
 fn mmcif_parser(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(print, m)?)?;
+    m.add_function(wrap_pyfunction!(parse, m)?)?;
     m.add_class::<MMCIF>()?;
     Ok(())
 }
