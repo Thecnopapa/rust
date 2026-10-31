@@ -31,7 +31,7 @@ enum Status{
 }
 #[derive(Debug)]
 #[derive(PartialEq)]
-struct Dict {
+struct DictItem {
     key: String,
     subkey: String,
     val: String
@@ -49,6 +49,12 @@ struct ListItem {
 #[derive(Debug)]
 #[derive(PartialEq)]
 struct List {
+    key: String,
+    val: Vec<ListItem>
+}
+#[derive(Debug)]
+#[derive(PartialEq)]
+struct Dict {
     key: String,
     val: Vec<ListItem>
 }
@@ -72,21 +78,32 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>){
     let mut result: Vec<ParsedKey> = vec![];
     let mut current: ParsedKey = ParsedKey::None;
 
+    let mut dataname: String = "1234".to_string();
+
     if let Ok(lines) = read_lines(filepath) {
         for line in lines.map_while(Result::ok) {
             println!("\n{n} ({:?})", status);
             n+=1;
-            if n > 100 {break}
+            if n > 10 {break}
             let line = re.replace_all(&line, " ");
 
             //println!("{:?}", line);
-            let mut l: Vec<&str> = line.split(" ").collect();
+            let l: Vec<&str> = line.split(" ").collect();
             //l.pop();
             println!("{:?}", l);
 
             if l.len() == 0 {
                 continue
             }
+            
+            if l[0].starts_with("data_") {
+                let ll0: Vec<&str> = l.clone()[0].clone().split("_").collect();
+                dataname = ll0[1].to_string();
+                println!("DATANAME:{}", dataname);
+                continue
+            }
+
+
             println!(">>{}", l[0]);
             //println!("{}", l[0] == "loop_");
             match l[0] {
@@ -104,14 +121,18 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>){
 
                 },
                 _ => {
-                    if status == Status::LoopHeader {
-                        match l[0].chars().next() {
+                    match l[0].chars().next() {
                             Some(c) => if c != '_'  {
-                                status = Status::Loop;
+                                if status == Status::LoopHeader {
+                                    status = Status::Loop;
+                                } else {
+                                    status = Status::Dict;
+                                }
+                                
                                 },
                             None => {todo!()}
                         }
-                    }
+                    
                 },
             }
 
@@ -122,6 +143,7 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>){
                     println!("In loop header = {current:?}");
                     match current {
                         ParsedKey::None => {
+                            println!("Building new List");
                             let h: Vec<&str>= l[0].split(".").collect();
                             let k = h[0];
                             println!("Key = {k}");
@@ -136,10 +158,23 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>){
 
                 },
                 Status::Dict => {
+                    match current {
+                        ParsedKey::None => {
+                            println!("Building new Dict");
+                            let h: Vec<&str>= l[0].split(".").collect();
+                            let k = h[0];
+                            let s = h[1];
+                            println!("Key = {k}");
+                            current = ParsedKey::DictKey(Dict{key: k.to_string(), val: vec![]});
+                            println!("Current = {current:?}");
+                        },
+                        _ => {}
+                    }
 
                 },
             }
         }
     }
+    println!("DATANAME:{}", dataname);
     println!("RESULT:\n{:?}", result);
 }
