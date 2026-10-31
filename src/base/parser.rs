@@ -66,10 +66,19 @@ enum ParsedKey {
     None
 }
 
+
+#[derive(Debug)]
+struct Literal{
+    val: &String,
+    lit: Literal
+}
+
 #[derive(Debug)]
 enum Literal {
-    Delimiter(String, char),
-    Implicit,
+    Delimiter(String, char, ParsedKey),
+    Implicit(DictItem),
+    Implicit(ListItem),
+    Complete(String, char, ParsedKey),
     None
 }
 
@@ -93,18 +102,23 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>){
             println!("\n{n} ({:?})", status);
             n+=1;
             if n > 150 {break}
+            let line = line.trim().to_string();
             let l0: Vec<&str> = line.split(" ").collect();
             let l0 = l0[0];
 
-            println!("LITERAL: {literal:?}");
             println!("LITERAL: {literal:?}");
             match literal {
                 Literal::Delimiter(_, _) => {
                     println!("Inside literal: {line}");
                 }, 
-                Literal::Implicit => {
+                Literal::Implicit(dd) => {
                     println!("Inside implicit literal: {line}");
-                }, 
+                    literal = Literal::Delimiter(String::from(""), line.chars().next().unwrap(), dd);
+                },
+                Literal::Complete(_, _) => {
+                    literal = Literal::None;
+                    continue
+                },
                 _ => {
                     let line = re.replace_all(&line, " ");
 
@@ -168,8 +182,11 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>){
 
                     match status {
                         Status::Dict => {
-                            if l.len() <= 2{
-                                literal = Literal::Implicit;
+                            if l.len() <= 1{
+                                println!("New implicit literal");
+                                let s = h[1];
+                                let new_dict = DictItem{key: k.to_string(), subkey:s.to_string(), val: String::from("")};
+                                literal = Literal::Implicit(new_dict);
                             } 
                         },
                         _ => {}
@@ -188,7 +205,7 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>){
                     let h: Vec<&str>= l0.split(".").collect();
                     let k =  h[0];
                     match literal {
-                        Literal::None => {
+                        Literal::None | Literal::Implicit => {
                             match current {
                                 ParsedKey::None => {
                                     println!("Building new element");
@@ -203,31 +220,40 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>){
                                 _ => {}
                             }
                         },
-                        Literal::Implicit => {
-                            literal = Literal::Delimiter(String::from(""), line.chars().next().unwrap());
-                        },
-                        Literal::Delimiter(_, _) => {
-
-                        }
+                        
+                        _ => {}
 
                     }
                     
                     let mut v = String::from("");
+                    
+                    
+                    match literal{
+                        Literal::Delimiter(ref mut vv, cc) => {
 
-
-                    for c in line.chars() {
-                        match literal{
-                            Literal::Delimiter(ref mut vv, cc) => {
+                            for c in line.chars() {
                                 if c == cc {
-                                    println!("LITERAL end");
-                                    break
-                                }
+                                    if vv.len() != 0{
+                                        println!("LITERAL end {} {}", c, cc);
+                                        literal = Literal::Complete(vv.trim_matches(cc).to_string(), cc);
+                                        break
+                                    }
+                                    
+                                } 
                                 vv.push(c.clone())
-                            },
-                            _ => {
+                            }
+                        },
+
+                        Literal::None => {
+                            let ld: Vec<&str> = line.split(" ").collect();
+                            let ld = ld[1..].join(" ");
+                            let ld = ld.trim_start_matches(" ");
+                            for c in ld.chars() {
                                 v.push(c.clone());
                             }
-                        }
+                        },
+                        _ => {}
+                    
                     }
                     
                     
@@ -236,11 +262,15 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>){
                             match current {
                                 ParsedKey::DictKey(ref mut d) => {
                                     match literal {
-                                        Literal::None | Literal::Implicit => {
+                                        Literal::None => {
                                             // let h: Vec<&str>= l0.split(".").collect();
                                             // let k =  h[0];
                                             let s = h[1];
-                                            d.val.push(DictItem{key: k.to_string(), subkey:s.to_string(), val: v.clone()});
+                                            let new_dict = DictItem{key: k.to_string(), subkey:s.to_string(), val: v.clone()};
+                                            d.val.push(new_dict);
+                                        },
+                                        Literal::Complete(ref vv, cc, dd) => {
+                                            d.val.push(dd);
                                         },
                                         _ => {}
 
