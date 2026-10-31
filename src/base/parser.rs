@@ -29,6 +29,38 @@ enum Status{
     Dict,
     Blank,
 }
+#[derive(Debug)]
+#[derive(PartialEq)]
+struct Dict {
+    key: String,
+    subkey: String,
+    val: String
+}
+
+#[derive(Debug)]
+#[derive(PartialEq)]
+struct ListItem {
+    key: String,
+    subkey: String,
+    n: i32,
+    val: Vec<String>,
+}
+
+#[derive(Debug)]
+#[derive(PartialEq)]
+struct List {
+    key: String,
+    val: Vec<ListItem>
+}
+
+#[derive(Debug)]
+#[derive(PartialEq)]
+enum ParsedKey {
+    ListKey(List),
+    DictKey(Dict),
+    None
+}
+
 
 pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>){
     println!("Parsing file: {filepath}");
@@ -36,6 +68,9 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>){
     let mut in_literal = false;
     let re = Regex::new(r"  *").unwrap();
     let mut n = 0;
+
+    let mut result: Vec<ParsedKey> = vec![];
+    let mut current: ParsedKey = ParsedKey::None;
 
     if let Ok(lines) = read_lines(filepath) {
         for line in lines.map_while(Result::ok) {
@@ -57,28 +92,46 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>){
             match l[0] {
                 "#" => {
                     status = Status::Blank;
+                    current = ParsedKey::None;
+                    in_literal = false;
                     println!("status --> {status:?}");
                 },
 
                 "loop_" => {
                     status = Status::LoopHeader;
                     println!("status --> {status:?}");
+                    continue
+
                 },
                 _ => {
                     if status == Status::LoopHeader {
                         match l[0].chars().next() {
-                            Some(c) => if c == '_'  {status = Status::Loop;},
+                            Some(c) => if c != '_'  {
+                                status = Status::Loop;
+                                },
                             None => {todo!()}
                         }
                     }
                 },
             }
 
+            println!("Current = {current:?}");
             match status {
                 Status::Blank => {continue},
                 Status::LoopHeader => {
+                    println!("In loop header = {current:?}");
+                    match current {
+                        ParsedKey::None => {
+                            let h: Vec<&str>= l[0].split(".").collect();
+                            let k = h[0];
+                            println!("Key = {k}");
+                            current = ParsedKey::ListKey(List{key: k.to_string(), val: vec![]});
+                            println!("Current = {current:?}");
+                        },
+                        _ => {}
+                    }
 
-                }
+                },
                 Status::Loop => {
 
                 },
@@ -88,4 +141,5 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>){
             }
         }
     }
+    println!("RESULT:\n{:?}", result);
 }
