@@ -61,16 +61,70 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data{
 
     let re = Regex::new(r"  *").unwrap(); // Pattern to merge spaces
 
-    let data = Data{
+    let data = Data{ // This will be the function output
         dataname:"0UNK".to_string(), // Default PDB code
-        fields: vec![]
+        fields: vec![] // Initialise empty data
     };
 
-    let mut n = 0; // Line counter
+    let mut n = -1; // Line counter
     let mut status = Status::Blank; // Current parser status
     if let Ok(lines) = read_lines(filepath) {
         for line in lines.map_while(Result::ok) {
+            n += 1;
+            if n >150 {
+                break
+            }
             // Loop through every line in file
+            println!("\n[{n}] {:?}", line);
+            let l = re.replace_all(&line, " "); // l is line with compressed spaces (and trimmed)
+            let l = l.trim();
+            println!("l: {:?}", l);
+            let line_comps: Vec<&str> = l.split(" ").collect(); // line_comps is vector splid by spaces
+            println!("line_comps: {:?}", line_comps);
+            let l0 = line_comps[0]; // l0 is first word
+            println!("l0: {:?}", l0);
+
+            let c0 = l0.chars().next(); // c0 is first char (Some()/None)
+
+
+
+
+            // Detect end of block and empty lines
+            match status{
+                Status::Literal =>{} // Not applied if inside literal
+                _ => {
+                    match c0 {
+                        Some(c) => {
+                            match c {
+                                // Block end
+                                '#' => {
+                                    println!("End of block!");
+                                    // TODO: Reset block vars
+                                    status = Status::Blank;
+                                    continue
+                                },
+                                // Line with key
+                                '_' => {
+                                    println!("Key detected!");
+                                },
+                                _ => {}
+                            }
+                        },
+                        // Blank line (outside literal)
+                        None => {
+                            println!("Empty line!");
+                            continue
+                        }
+                    }
+                }
+
+            }
+
+
+
+
+
+
 
 
 
@@ -84,6 +138,6 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data{
         }
     }
     println!("DATA: {:?}", data);
-    return data;
+    return data; // Return parsed data
 }
 // #####################################################################################################################
