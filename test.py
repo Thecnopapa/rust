@@ -1,7 +1,7 @@
 import mmcif_parser
 import os
 
-filepath = "/home/iain/downloads/1M2Z.cif"
+filepath = "./test-cases/1M2Z.cif"
 assert os.path.exists(filepath)
 mmcif_parser.parse(filepath, ["all"], ["none"])
 
