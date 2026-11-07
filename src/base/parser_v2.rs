@@ -30,10 +30,30 @@ enum Status{
     LoopHeader,
     Dict,
     Blank,
+    Literal,
+}
+
+#[derive(Debug)]
+struct Item {
+    n: i32,
+    values: Vec<String>
+}
+
+#[derive(Debug)]
+struct Field{
+    key: String,
+    subkeys: Vec<String>,
+    subitems: Vec<Item>
+}
+
+#[derive(Debug)]
+pub struct Data{
+    dataname: String,
+    fields: Vec<Field>
 }
 
 
-pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>){
+pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data{
     println!("Parsing file: {filepath}");
     println!("INCLUDE:{:?}", include); // Keys to include
     println!("EXCLUDE:{:?}", exclude); // Keys to exclude
@@ -41,8 +61,11 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>){
 
     let re = Regex::new(r"  *").unwrap(); // Pattern to merge spaces
 
+    let data = Data{
+        dataname:"0UNK".to_string(), // Default PDB code
+        fields: vec![]
+    };
 
-    let mut dataname: String = "0UNK".to_string(); // Default PDB code
     let mut n = 0; // Line counter
     let mut status = Status::Blank; // Current parser status
     if let Ok(lines) = read_lines(filepath) {
@@ -60,5 +83,7 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>){
 
         }
     }
+    println!("DATA: {:?}", data);
+    return data;
 }
 // #####################################################################################################################
