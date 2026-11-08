@@ -240,7 +240,16 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data 
                 },
                 Status::Loop => {
                     println!("New loop item");
-                    current_item = Current::Item(Item{n:current_n, values:vec![]});
+                    let mut vals = vec![];
+                    for lc in line_comps {
+                        vals.push(lc.to_string());
+                    }
+                    match current_field {
+                        Current::Field(ref mut f) => {
+                            f.subitems.push(Item{n:current_n, values:vals})
+                        },
+                        _ => {}
+                    }
                     current_n += 1;
                 },
                 _ => {}
@@ -270,9 +279,7 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data 
 
                         },
                         Status::Loop => {
-                            for lc in line_comps {
-                                i.values.push(lc.to_string());
-                            }
+
                         },
                         _ => {}
                     }
