@@ -41,6 +41,7 @@ struct Item {
 
 #[derive(Debug)]
 struct Field{
+    mode: String,
     key: String,
     subkeys: Vec<String>,
     subitems: Vec<Item>
@@ -75,12 +76,14 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data 
 
     let re = Regex::new(r"  *").unwrap(); // Pattern to merge spaces
 
-    let data = Data{ // This will be the function output
+    let mut data = Data{ // This will be the function output
         dataname:"0UNK".to_string(), // Default PDB code
         fields: vec![] // Initialise empty data
     };
 
     let mut current_field = Current::None;
+    let mut current_item = Current::None;
+    let mut current_n = 0;
     let mut pending = Pending::None;
 
     let mut n = -1; // Line counter
@@ -88,7 +91,7 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data 
     if let Ok(lines) = read_lines(filepath) {
         for line in lines.map_while(Result::ok) {
             n += 1;
-            if n >150 {
+            if n >15 {
                 break
             }
             // Loop through every line in file
@@ -117,9 +120,24 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data 
                                 '#' => {
                                     println!("End of block!");
                                     // TODO: Reset block vars
+                                    match current_field {
+                                        Current::Field(mut f) => {
+                                            match current_item {
+                                                Current::Item(i) => {
+                                                    f.subitems.push(i);
+                                                },
+                                                _ => {}
+                                            }
+                                            data.fields.push(f);
+                                        },
+                                        _ => {}
+                                    }
+
                                     pending = Pending::None;
                                     status = Status::Blank;
                                     current_field = Current::None;
+                                    current_item = Current::None;
+                                    current_n = 0;
                                     continue
                                 },
                                 // Line with key
@@ -150,7 +168,14 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data 
                                             status = Status::LoopHeader;
                                             continue
                                         },
-                                        _ => {}
+                                        _ => {
+                                            if l0.split("_").collect::<Vec<&str>>()[0] == "data" {
+                                                // Data name found
+                                                println!("Dataname found!");
+                                                data.dataname = l0.split("_").collect::<Vec<&str>>()[1].to_string();
+                                                continue
+                                            }
+                                        }
                                     }
                                     match status {
                                         Status::LoopHeader => {
@@ -176,7 +201,12 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data 
                 Pending::NewField => {
                     let k = l0.split(".").collect::<Vec<&str>>()[0].to_string();
                     println!("NEW field: {:?}", k);
-                    current_field = Current::Field(Field{key:k, subkeys:vec![], subitems:vec![]});
+                    match status {
+                        Status::Dict => {current_field = Current::Field(Field{mode:String::from("dict"), key:k, subkeys:vec![], subitems:vec![]});},
+                        Status::LoopHeader => {current_field = Current::Field(Field{mode:String::from("loop"), key:k, subkeys:vec![], subitems:vec![]});},
+                        _ => {}
+                    }
+
                 },
                 _ => {}
             }
@@ -196,6 +226,76 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data 
             }
             println!("FIELD: {:?}", current_field);
             pending = Pending::None;
+
+            match status {
+                Status::Dict => {
+                    match current_item {
+                        Current::None => {
+                            println!("New dict item");
+                            current_item = Current::Item(Item{n:0, values:vec![]});
+
+                        },
+                        _ => {}
+                    }
+                },
+                Status::Loop => {
+                    println!("New loop item");
+                    current_item = Current::Item(Item{n:current_n, values:vec![]});
+                    current_n += 1;
+                },
+                _ => {}
+            }
+            println!("ITEM: {:?}", current_item);
+
+
+
+            match current_item {
+                Current::Item(ref mut i) => {
+                    println!("CURRENT ITEM: {i:?}");
+                    match status {
+                        Status::Dict => {
+                            let mut val = String::from("");
+
+                            let l1 = &line.split(" ").collect::<Vec<&str>>()[1..];
+                            let l1 = l1.join(" ");
+                            let l1 = l1.trim();
+                            println!("LINE: {l1:?}");
+
+                            for c in l1.chars() {
+                                print!("{c:?}");
+                                val.push(c);
+                            }
+                            println!("\nVAL: {val:?}");
+                            i.values.push(val);
+
+                        },
+                        Status::Loop => {
+                            for lc in line_comps {
+                                i.values.push(lc.to_string());
+                            }
+                        },
+                        _ => {}
+                    }
+                    println!("CURRENT ITEM: {i:?}, {}", i.values.len());
+                },
+                _ => {}
+            }
+            match data.fields.last() {
+                Some(last) => {
+                    println!("LAST FIELD: {:?}", &last);
+                    println!("LAST SUBKEYS: {:?}", &last.subkeys);
+                    println!("LAST N SUBITEMS: {:?}", &last.subitems.len());
+                    for val in &last.subitems {
+                        println!("{:?}: {:?}", val.n, val.values);
+                    }
+                },
+                None => {}
+            }
+
+
+
+
+
 
 
 
