@@ -52,8 +52,22 @@ pub struct Data{
     fields: Vec<Field>
 }
 
+#[derive(Debug)]
+enum Pending{
+    NewField,
+    NewKey,
+    None
+}
 
-pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data{
+#[derive(Debug)]
+enum Current{
+    Field(Field),
+    Item(Item),
+    None
+}
+
+
+pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data {
     println!("Parsing file: {filepath}");
     println!("INCLUDE:{:?}", include); // Keys to include
     println!("EXCLUDE:{:?}", exclude); // Keys to exclude
@@ -65,6 +79,9 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data{
         dataname:"0UNK".to_string(), // Default PDB code
         fields: vec![] // Initialise empty data
     };
+
+    let mut current_field = Current::None;
+    let mut pending = Pending::None;
 
     let mut n = -1; // Line counter
     let mut status = Status::Blank; // Current parser status
@@ -100,14 +117,49 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data{
                                 '#' => {
                                     println!("End of block!");
                                     // TODO: Reset block vars
+                                    pending = Pending::None;
                                     status = Status::Blank;
+                                    current_field = Current::None;
                                     continue
                                 },
                                 // Line with key
                                 '_' => {
                                     println!("Key detected!");
+                                    match status {
+                                        Status::Blank => {
+                                            // New field
+                                            pending = Pending::NewField;
+                                            status = Status::Dict;
+                                        },
+                                        Status::Dict => {
+                                            // New key
+                                            pending = Pending::NewKey;
+                                        },
+                                        Status::LoopHeader => {
+                                            // New loop key
+                                            pending = Pending::NewKey;
+                                        },
+                                        _ => {}
+                                    }
                                 },
-                                _ => {}
+                                _ => {
+                                    match l0 {
+                                        "loop_" => {
+                                            // Start loop header
+                                            println!("Loop detected!");
+                                            status = Status::LoopHeader;
+                                            continue
+                                        },
+                                        _ => {}
+                                    }
+                                    match status {
+                                        Status::LoopHeader => {
+                                            // Start loop
+                                            status = Status::Loop;
+                                        },
+                                        _ => {}
+                                    }
+                                }
                             }
                         },
                         // Blank line (outside literal)
@@ -119,6 +171,32 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data{
                 }
 
             }
+            println!("STATUS: {:?}", status);
+            match pending {
+                Pending::NewField => {
+                    let k = l0.split(".").collect::<Vec<&str>>()[0].to_string();
+                    println!("NEW field: {:?}", k);
+                    current_field = Current::Field(Field{key:k, subkeys:vec![], subitems:vec![]});
+                },
+                _ => {}
+            }
+
+            match pending {
+                Pending::NewField | Pending::NewKey=> {
+                    let subk = l0.split(".").collect::<Vec<&str>>()[1].to_string();
+                    println!("NEW subkey: {:?}", subk);
+                    match current_field {
+                        Current::Field(ref mut f) => {
+                            f.subkeys.push(subk);
+                        },
+                        _ => {}
+                    }
+                },
+                _ => {}
+            }
+            println!("FIELD: {:?}", current_field);
+            pending = Pending::None;
+
 
 
 
