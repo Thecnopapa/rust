@@ -288,36 +288,59 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data 
                 // If loop add new subitem with values
                 Status::Loop => {
                     println!("New loop item");
-                    let mut vals = vec![String::from("")];
+                    let mut vals = vec![];
+                    let mut val = String::from("");
 
 
                     for c in line.chars() {
                         print!("{c:?}");
                         match c {
                             ' ' => {
-                                match vals.last() {
-                                    Some(val) => {
+                                match literal {
+                                    Literal::None => {
                                         if val.len() > 0 {
-                                            vals.push(String::from(""));
+                                            vals.push(val.clone());
+                                            val = String::from("");
                                             continue
                                         }
                                     },
-                                    _ => {}
+                                    _ => {
+                                        val.push(' ');
+                                    }
                                 }
 
                             },
+                            cc => {
+                                if DELIMITERS.contains(&cc) {
+                                    match literal {
+                                        Literal::None => {
+                                            println!("\nInline literal start: {c}");
+                                            literal = Literal::Inline(cc.clone());
+                                        },
+                                        Literal::Inline(dd) => {
+                                            println!("\nInline literal : {cc} {dd}");
+                                            if dd == cc {
+                                                println!("\nInline literal end: {c}");
+                                                literal = Literal::None;
+                                            }
+                                        },
+                                        _ => {}
+                                    }
+
+                                }
+                                val.push(cc);
+                            }
+                        }
+
+                    }
+                    match literal {
+                            Literal::Inline(dd) => {
+                                println!("Inline literal unfinished -> Multiline literal");
+                                literal = Literal::Multiline(dd);
+                                todo!("Multiline literals")
+                            },
                             _ => {}
                         }
-                        match vals.last() {
-                            Some(val) => {},
-                            _ => {}
-                        }
-                    }
-
-                    for lc in line_comps {
-                        vals.push(lc.to_string());
-                    }
-
 
                     match current_field {
                         Current::Field(ref mut f) => {
@@ -363,17 +386,6 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data 
                 },
                 _ => {}
             }
-            // match data.fields.last() {
-            //     Some(last) => {
-            //         println!("LAST FIELD: {:?}", &last);
-            //         println!("LAST SUBKEYS: {:?}", &last.subkeys);
-            //         println!("LAST N SUBITEMS: {:?}", &last.subitems.len());
-            //         for val in &last.subitems {
-            //             println!("{:?}: {:?}", val.n, val.values);
-            //         }
-            //     },
-            //     None => {}
-            // }
 
 
 
