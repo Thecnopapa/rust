@@ -207,6 +207,8 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data 
 
             }
             println!("STATUS: {:?}", status);
+
+            // If new key found, and not new field created(eg. first loopheader), then upgrade to newfield
             match pending {
                 Pending::NewKey => {
                     match current_field {
@@ -219,6 +221,7 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data 
                 _ => {}
             }
 
+            // Create new field
             match pending {
                 Pending::NewField => {
                     let k = l0.split(".").collect::<Vec<&str>>()[0].to_string();
@@ -233,6 +236,7 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data 
                 _ => {}
             }
 
+            // Add new subkey to current field
             match pending {
                 Pending::NewField | Pending::NewKey=> {
                     let subk = l0.split(".").collect::<Vec<&str>>()[1].to_string();
@@ -247,9 +251,12 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data 
                 _ => {}
             }
             println!("CURRENT FIELD: {:?}", current_field);
-            pending = Pending::None;
+            pending = Pending::None; // Reset pending
 
+
+            // Create subitems
             match status {
+                // If dict add new empty subitem
                 Status::Dict => {
                     match current_item {
                         Current::None => {
@@ -259,6 +266,7 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data 
                         _ => {}
                     }
                 },
+                // If loop add new subitem with values
                 Status::Loop => {
                     println!("New loop item");
                     let mut vals = vec![];
@@ -278,11 +286,12 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data 
 
 
 
-
+            // Update subitem
             match current_item {
                 Current::Item(ref mut i) => {
                     println!("CURRENT ITEM: {i:?}");
                     match status {
+                        // If dict update current item
                         Status::Dict => {
                             let mut val = String::from("");
 
@@ -297,9 +306,6 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data 
                             }
                             println!("\nVAL: {val:?}");
                             i.values.push(val);
-
-                        },
-                        Status::Loop => {
 
                         },
                         _ => {}
