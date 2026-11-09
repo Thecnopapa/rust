@@ -23,14 +23,25 @@ pub fn read(filepath:String){
 
 // Real parser starts here #############################################################################################
 
+const DELIMITERS:[char; 3] = ['\'', ';', '"'];
+
+
+
+
+
 #[derive(Debug)]
-#[derive(PartialEq)]
 enum Status{
     Loop,
     LoopHeader,
     Dict,
     Blank,
-    Literal,
+}
+
+#[derive(Debug)]
+enum Literal{
+    Inline(char),
+    Multiline(char),
+    None
 }
 
 #[derive(Debug)]
@@ -88,10 +99,12 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data 
 
     let mut n = -1; // Line counter
     let mut status = Status::Blank; // Current parser status
+    let mut literal = Literal::None; // Current literal status
+
     if let Ok(lines) = read_lines(filepath) {
         for line in lines.map_while(Result::ok) {
             n += 1;
-            if n >33 {
+            if n >100 {
                 break
             }
             // Loop through every line in file
@@ -110,8 +123,8 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data 
 
 
             // Detect end of block and empty lines
-            match status{
-                Status::Literal =>{} // Not applied if inside literal
+            match literal{
+                Literal::Multiline(_) =>{} // Not applied if inside multiline literal
                 _ => {
                     match c0 {
                         Some(c) => {
@@ -119,17 +132,7 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data 
                                 // Block end
                                 '#' => {
                                     println!("End of block!");
-                                    match data.fields.last() {
-                                        Some(last) => {
-                                            println!("LAST FIELD: {:?}", &last);
-                                            println!("LAST SUBKEYS: {:?}", &last.subkeys);
-                                            println!("LAST N SUBITEMS: {:?}", &last.subitems.len());
-                                            for val in &last.subitems {
-                                                println!("{:?}: {:?}", val.n, val.values);
-                                            }
-                                        },
-                                        None => {}
-                                    }
+
                                     match current_field {
                                         Current::Field(mut f) => {
                                             match current_item {
@@ -142,9 +145,21 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data 
                                         },
                                         _ => {}
                                     }
+                                    match data.fields.last() {
+                                        Some(last) => {
+                                            println!("LAST FIELD: {:?}", &last);
+                                            println!("LAST SUBKEYS: {:?}", &last.subkeys);
+                                            println!("LAST N SUBITEMS: {:?}", &last.subitems.len());
+                                            for val in &last.subitems {
+                                                println!("{:?}: {:?}", val.n, val.values);
+                                            }
+                                        },
+                                        None => {}
+                                    }
 
                                     pending = Pending::None;
                                     status = Status::Blank;
+                                    literal = Literal::None;
                                     current_field = Current::None;
                                     current_item = Current::None;
                                     current_n = 0;
@@ -250,7 +265,11 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data 
                 },
                 _ => {}
             }
-            println!("CURRENT FIELD: {:?}", current_field);
+            match current_field{
+                Current::Field(ref f) => {println!("CURRENT FIELD: {:?}", f.key);},
+                _ => {}
+            }
+
             pending = Pending::None; // Reset pending
 
 
@@ -269,12 +288,42 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data 
                 // If loop add new subitem with values
                 Status::Loop => {
                     println!("New loop item");
-                    let mut vals = vec![];
+                    let mut vals = vec![String::from("")];
+
+
+                    for c in line.chars() {
+                        print!("{c:?}");
+                        match c {
+                            ' ' => {
+                                match vals.last() {
+                                    Some(val) => {
+                                        if val.len() > 0 {
+                                            vals.push(String::from(""));
+                                            continue
+                                        }
+                                    },
+                                    _ => {}
+                                }
+
+                            },
+                            _ => {}
+                        }
+                        match vals.last() {
+                            Some(val) => {},
+                            _ => {}
+                        }
+                    }
+
                     for lc in line_comps {
                         vals.push(lc.to_string());
                     }
+
+
                     match current_field {
                         Current::Field(ref mut f) => {
+                            println!("SUBK: {:?}", f.subkeys);
+                            println!("VALS: {:?}", vals);
+                            assert!(vals.len() == f.subkeys.len(), "N subkeys: {:?} / N vals: {:?}", f.subkeys.len(), vals.len());
                             f.subitems.push(Item{n:current_n, values:vals});
                         },
                         _ => {}
@@ -301,7 +350,7 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data 
                             println!("LINE: {l1:?}");
 
                             for c in l1.chars() {
-                                print!("{c:?}");
+                                //print!("{c:?}");
                                 val.push(c);
                             }
                             println!("\nVAL: {val:?}");
