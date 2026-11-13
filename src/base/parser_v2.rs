@@ -31,7 +31,7 @@ const DELIMITERS:[char; 3] = ['\'', ';', '"'];
 
 #[derive(Debug)]
 enum Status{
-    Loop,
+    Loop(bool),
     LoopHeader,
     Dict,
     Blank,
@@ -104,7 +104,7 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data 
     if let Ok(lines) = read_lines(&filepath) {
         for line in lines.map_while(Result::ok) {
             n += 1;
-            if n >155 {
+            if n >230 {
                 break
             }
             // Loop through every line in file
@@ -205,7 +205,7 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data 
                                     match status {
                                         Status::LoopHeader => {
                                             // Start loop
-                                            status = Status::Loop;
+                                            status = Status::Loop(false);
                                         },
                                         _ => {}
                                     }
@@ -286,7 +286,7 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data 
                     }
                 },
                 // If loop add new subitem with values
-                Status::Loop => {
+                Status::Loop(splitloop)=> {
                     println!("New loop item");
                     let mut vals = vec![];
                     let mut val = String::from("");
@@ -299,6 +299,7 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data 
                                 match literal {
                                     Literal::None => {
                                         if val.len() > 0 {
+                                            println!("\nNEW VAL: {:?}", val);
                                             vals.push(val.clone());
                                             val = String::from("");
                                             continue
@@ -337,7 +338,7 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data 
                             Literal::Inline(dd) => {
                                 println!("Inline literal unfinished -> Multiline literal");
                                 literal = Literal::Multiline(dd);
-                                todo!("Multiline literals")
+                                //todo!("Multiline literals")
                             },
                             _ => {}
                         }
@@ -345,9 +346,32 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data 
                     match current_field {
                         Current::Field(ref mut f) => {
                             println!("SUBK: {:?}", f.subkeys);
-                            println!("VALS: {:?}", vals);
-                            assert!(vals.len() == f.subkeys.len(), "N subkeys: {:?} / N vals: {:?}", f.subkeys.len(), vals.len());
-                            f.subitems.push(Item{n:current_n, values:vals});
+                            println!("VALS: {:?}", &vals);
+                            if splitloop {
+                                // last has missing vals -> push to last item
+                                println!("Pushing to last item");
+                                let last_n = &f.subitems.len() - 1;
+                                let last = &mut f.subitems[last_n];
+                                //let mut last_values = last.values;
+                                last.values.extend(vals);
+                                if last.values.len() == f.subkeys.len() {
+                                    status = Status::Loop(false);
+                                } else if last.values.len() > f.subkeys.len() {
+                                        todo!("Too many values in loop item: N subkeys: {:?} / N vals: {:?}", f.subkeys.len(), last.values.len());
+                                }
+
+                            } else {
+                                // add new item
+                                if vals.len() < f.subkeys.len() {
+                                    // if missing vals declare splitloop
+                                    println!("Key value missmatch: N subkeys: {:?} / N vals: {:?}", f.subkeys.len(), vals.len());
+                                    status = Status::Loop(true);
+                                } else if vals.len() > f.subkeys.len() {
+                                    todo!("Too many values in loop item: N subkeys: {:?} / N vals: {:?}", f.subkeys.len(), vals.len())
+                                }
+                                f.subitems.push(Item{n:current_n, values:vals});
+                            }
+
                         },
                         _ => {}
                     }
