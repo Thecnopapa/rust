@@ -7,13 +7,13 @@ use regex::Regex;
 // Misc functions ######################################################################################################
 fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
 where P: AsRef<Path>, {
-    let file = File::open(filename)?;
+    let file = File::open(&filename)?;
     Ok(io::BufReader::new(file).lines())
 }
 
 pub fn read(filepath:String){
-    println!("Parsing file: {filepath}");
-    if let Ok(lines) = read_lines(filepath) {
+    println!("Parsing file: {:?}", filepath);
+    if let Ok(lines) = read_lines(&filepath) {
         for line in lines.map_while(Result::ok) {
             println!("{}", line);
         }
@@ -101,10 +101,10 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data 
     let mut status = Status::Blank; // Current parser status
     let mut literal = Literal::None; // Current literal status
 
-    if let Ok(lines) = read_lines(filepath) {
+    if let Ok(lines) = read_lines(&filepath) {
         for line in lines.map_while(Result::ok) {
             n += 1;
-            if n >100 {
+            if n >155 {
                 break
             }
             // Loop through every line in file
@@ -266,7 +266,7 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data 
                 _ => {}
             }
             match current_field{
-                Current::Field(ref f) => {println!("CURRENT FIELD: {:?}", f.key);},
+                Current::Field(ref f) => {println!("CURRENT FIELD: {:?} {:?}", f.key, f.subkeys)},
                 _ => {}
             }
 
@@ -314,13 +314,13 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data 
                                 if DELIMITERS.contains(&cc) {
                                     match literal {
                                         Literal::None => {
-                                            println!("\nInline literal start: {c}");
+                                            println!("\nInline literal start (loop): {c}");
                                             literal = Literal::Inline(cc.clone());
                                         },
                                         Literal::Inline(dd) => {
-                                            println!("\nInline literal : {cc} {dd}");
+                                            println!("\nInline literal (loop): {cc:?} {dd:?}");
                                             if dd == cc {
-                                                println!("\nInline literal end: {c}");
+                                                println!("Inline literal end (loop): {c}");
                                                 literal = Literal::None;
                                             }
                                         },
@@ -366,23 +366,78 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data 
                         // If dict update current item
                         Status::Dict => {
                             let mut val = String::from("");
-
                             let l1 = &line.split(" ").collect::<Vec<&str>>()[1..];
                             let l1 = l1.join(" ");
-                            let l1 = l1.trim();
-                            println!("LINE: {l1:?}");
+                            let mut l1 = l1.trim();
 
+                            let mut add_to_last = false;
+                            // If dict line does not start with _, then parse entire line
+                            match c0 {
+                                Some(cc) => {
+                                    println!("C0: {cc:?}");
+                                    match cc{
+                                        '_' => {},
+                                        _ => {
+                                            l1 = &line;
+                                            println!("No key -> add_to_last");
+
+                                            add_to_last = true;
+                                        }
+                                    }
+                                },
+                                _ => {}
+                            }
+
+                            println!("LINE: {l1:?}");
                             for c in l1.chars() {
                                 //print!("{c:?}");
+                                if DELIMITERS.contains(&c) {
+                                    match literal {
+                                        Literal::None => {
+                                            println!("Inline literal start (dict): {c}");
+                                            literal = Literal::Inline(c.clone());
+                                        },
+                                        Literal::Inline(dd) | Literal::Multiline(dd) => {
+                                            println!("Inline literal (dict): {c:?} {dd:?}");
+                                            if dd == c {
+                                                println!("Inline literal end (dict): {c}");
+                                                literal = Literal::None;
+                                            }
+                                        }
+                                    }
+                                }
                                 val.push(c);
                             }
-                            println!("\nVAL: {val:?}");
-                            i.values.push(val);
+                            println!("VAL: {val:?}");
+
+                            match literal {
+                                Literal::Inline(dd) => {
+                                    println!("Inline literal unfinished (dict) -> Multiline literal");
+                                    literal = Literal::Multiline(dd);
+                                },
+                                Literal::Multiline(_) => {
+                                    println!("Multiline -> add_to_last");
+                                    add_to_last = true;
+                                },
+                                _ => {}
+                            }
+
+                            if add_to_last {
+                                println!("Adding to last");
+                                let last_n = i.values.len()-1;
+                                let last = i.values[last_n].clone();
+                                i.values[last_n] = last + &val;
+
+                            } else {
+                                i.values.push(val);
+                            }
+
+
 
                         },
                         _ => {}
                     }
-                    println!("CURRENT ITEM: {i:?}, {}", i.values.len());
+                    println!("UPDATED ITEM: {i:?}, {}", i.values.len());
                 },
                 _ => {}
             }
@@ -398,6 +453,7 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data 
         }
     }
     println!("\nDATA: {:?}", data);
+    println!("\nFILEPATH: {}", &filepath);
     return data; // Return parsed data
 }
 // #####################################################################################################################
