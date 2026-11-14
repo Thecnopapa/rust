@@ -2,8 +2,8 @@ use std::iter::zip;
 use pyo3::prelude::*;
 mod base;
 
-use pyo3::types::{PyDict, PyInt, PyString, PyList};
-use pyo3::conversion::IntoPyObject;
+use pyo3::types::{PyDict, PyNone};
+//use pyo3::conversion::IntoPyObject::into_pyobject;
 //use pyo3::PyTypeInfo;
 
 // #[pyclass()]
@@ -36,29 +36,71 @@ use pyo3::conversion::IntoPyObject;
 fn read_mmcif<'py>(py: Python<'py>, filepath:String, subset:Vec<String>, exclude:Vec<String>, as_dict:bool, verbose:bool) -> PyResult<Bound<'py, PyDict>> {
     let data = base::parser::parse(filepath.clone(), subset.clone(), exclude.clone(), verbose);
     let fields = data.fields;
-    let mut dict = PyDict::new(py);
+    let dict = PyDict::new(py);
     for field in fields{
         match field.mode.as_str() {
             "dict"|"loop" => {
-                let key: Bound<'py, PyString> = PyString::new(py, &field.key);
+                //let key: Bound<'py, PyString> = PyString::new(py, &field.key);
                 let mut items: Vec<Bound<'_, PyDict>> = vec![];
                 //let obj = Bound<'py, PyObject> = PyObject::from((key, items));
                 for item in field.subitems{
-                    let mut subdict = PyDict::new(py);
+                    let subdict = PyDict::new(py);
                     for (k, v) in zip(field.subkeys.iter(), item.values.iter()){
-                        subdict.set_item(k.to_string(), v.to_string());
+                        match v.chars().next() {
+                            Some(cc) => {
+                                match cc {
+                                    '.' | '?' => {
+                                         let _ = subdict.set_item(k.to_string(), PyNone::get(py));
+                                         continue
+                                    },
+                                    _ => {}
+                                }
+                            },
+                            None => {
+                                let _ = subdict.set_item(k.to_string(), PyNone::get(py));
+                                continue
+                            }
+
+                        }
+                        match v.parse::<i32>() {
+                            Ok(vv) => {
+                                let _ = subdict.set_item(k.to_string(), vv);
+                                continue
+                            },
+                            Err(..) =>{
+                                match v.parse::<f32>() {
+                                    Ok(vv) => {
+                                        let _ = subdict.set_item(k.to_string(), vv);
+                                        continue
+                                    },
+                                    Err(..) =>{
+                                        match v.parse::<bool>() {
+                                            Ok(vv) => {
+                                                let _ = subdict.set_item(k.to_string(), vv);
+                                                continue
+                                            },
+                                            Err(..) =>{let _ = subdict.set_item(k.to_string(), v);}
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
                     }
                     items.push(subdict);
                 }
-                dict.set_item::<&String, Vec<Bound<'_, PyDict>>>(&field.key, items);
+                let _ = dict.set_item::<&String, Vec<Bound<'_, PyDict>>>(&field.key, items);
             },
             _ => {}
         }
 
     }
     //let dict = PyDict::new(PyString, PyDict);
+    if as_dict {
+       return Ok(dict)
+    }
+    todo!("Return MMCIF")
 
-    return Ok(dict)
 
 }
 

@@ -35,7 +35,7 @@ enum Literal{
 
 #[derive(Debug)]
 pub struct Item {
-    n: i32,
+    _n: i32,
     pub values: Vec<String>
 }
 
@@ -310,7 +310,7 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>, verbose:
                     match current_item {
                         Current::None => {
                             //println!("New dict item");
-                            current_item = Current::Item(Item{n:0, values:vec![]});
+                            current_item = Current::Item(Item{_n:0, values:vec![]});
                         },
                         _ => {}
                     }
@@ -429,7 +429,7 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>, verbose:
                                 } else if vals.len() > f.subkeys.len() {
                                     todo!("Too many values in loop item: N subkeys: {:?} / N vals: {:?}", f.subkeys.len(), vals.len())
                                 }
-                                f.subitems.push(Item{n:current_n, values:vals});
+                                f.subitems.push(Item{_n:current_n, values:vals});
                             }
 
                         },
@@ -479,6 +479,7 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>, verbose:
                                         Literal::None => {
                                             //println!("Inline literal start (dict): {c}");
                                             literal = Literal::Inline(c.clone());
+                                            continue
                                         },
                                         Literal::Inline(dd) | Literal::Multiline(dd) => {
                                             //println!("Inline literal (dict): {c:?} {dd:?}");
