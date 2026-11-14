@@ -17,9 +17,6 @@ where P: AsRef<Path>, {
 const DELIMITERS:[char; 3] = ['\'', ';', '"'];
 
 
-
-
-
 #[derive(Debug)]
 enum Status{
     Ignored,
@@ -37,23 +34,23 @@ enum Literal{
 }
 
 #[derive(Debug)]
-struct Item {
+pub struct Item {
     n: i32,
-    values: Vec<String>
+    pub values: Vec<String>
 }
 
 #[derive(Debug)]
-struct Field{
-    mode: String,
-    key: String,
-    subkeys: Vec<String>,
-    subitems: Vec<Item>
+pub struct Field{
+    pub mode: String,
+    pub key: String,
+    pub subkeys: Vec<String>,
+    pub subitems: Vec<Item>
 }
 
 #[derive(Debug)]
 pub struct Data{
-    dataname: String,
-    fields: Vec<Field>
+    pub dataname: String,
+    pub fields: Vec<Field>
 }
 
 #[derive(Debug)]
@@ -72,9 +69,12 @@ enum Current{
 
 
 pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>, verbose:bool) -> Data {
+    let mut include = include.clone();
+    let mut had_include = false;
     if verbose {
         println!("Parsing file: {filepath}");
         if include.len() > 0 {
+            had_include = true;
             println!("INCLUDE:{:?}", include); // Keys to include
         }
         if exclude.len() > 0 {
@@ -157,7 +157,11 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>, verbose:
                                     //     },
                                     //     None => {}
                                     // }
-
+                                    if had_include {
+                                        if include.len() == 0 {
+                                            break
+                                        }
+                                    }
                                     pending = Pending::None;
                                     status = Status::Blank;
                                     literal = Literal::None;
@@ -242,14 +246,22 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>, verbose:
                 Pending::NewField => {
                     let k = l0.split(".").collect::<Vec<&str>>()[0].to_string();
 
-                    if include.len() > 0{
-                        if !include.contains(&k) {
-                            //println!("IGNORED field: {:?}", k);
-                            status = Status::Ignored;
-                            pending = Pending::None;
-                            continue
+                    if had_include {
+                        for (i, ival) in include.iter().enumerate(){
+                            if ival == &k {
+                                //println!("IGNORED field: {:?}", k);
+                                include.remove(i);
+                                status = Status::Ignored;
+                                pending = Pending::None;
+                                break
+                            }
+                        }
+                        match status {
+                            Status::Ignored => {continue},
+                            _ => {}
                         }
                     }
+
                     if exclude.len() > 0{
                         if exclude.contains(&k) {
                             //println!("EXCLUDED field: {:?}", k);

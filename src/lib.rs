@@ -1,7 +1,9 @@
+use std::iter::zip;
 use pyo3::prelude::*;
 mod base;
 
-//use pyo3::types::{PyDict, PyString};
+use pyo3::types::{PyDict, PyInt, PyString, PyList};
+use pyo3::conversion::IntoPyObject;
 //use pyo3::PyTypeInfo;
 
 // #[pyclass()]
@@ -27,24 +29,41 @@ mod base;
 //     }
 // }
 
-/// Formats the sum of two numbers as string.
-#[pyfunction]
-fn print(filepath:String) -> PyResult<String> {
-    base::parser::parse(filepath.clone(), vec![], vec![], true);
-    return Ok(filepath.clone())
-}
 
 #[pyfunction]
-fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> PyResult<String> {
-    base::parser::parse(filepath.clone(), include.clone(), exclude.clone(), false);
-    return Ok(filepath)
+#[pyo3(name = "read_mmcif")]
+#[pyo3(signature = (filepath, subset=vec![], exclude=vec![], as_dict=false, verbose=false))]
+fn read_mmcif<'py>(py: Python<'py>, filepath:String, subset:Vec<String>, exclude:Vec<String>, as_dict:bool, verbose:bool) -> PyResult<Bound<'py, PyDict>> {
+    let data = base::parser::parse(filepath.clone(), subset.clone(), exclude.clone(), verbose);
+    let fields = data.fields;
+    let mut dict = PyDict::new(py);
+    for field in fields{
+        match field.mode.as_str() {
+            "dict"|"loop" => {
+                let key: Bound<'py, PyString> = PyString::new(py, &field.key);
+                let mut items: Vec<(String, String)> = vec![];
+                //let obj = Bound<'py, PyObject> = PyObject::from((key, items));
+                for item in field.subitems{
+                    for (k, v) in zip(field.subkeys.iter(), item.values.iter()){
+                        items.push((k.to_string(), v.to_string()));
+                    }
+                }
+                dict.set_item::<&String, Vec<(String, String)>>(&field.key, items);
+            },
+            _ => {}
+        }
+
+    }
+    //let dict = PyDict::new(PyString, PyDict);
+
+    return Ok(dict)
+
 }
 
 /// A Python module implemented in Rust.
 #[pymodule]
 fn mmcif_parser(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(print, m)?)?;
-    m.add_function(wrap_pyfunction!(parse, m)?)?;
+    m.add_function(wrap_pyfunction!(read_mmcif, m)?)?;
     //m.add_class::<MMCIF>()?;
     Ok(())
 }

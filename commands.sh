@@ -13,3 +13,7 @@ build (){
 test (){
     python test.py "$@"
 }
+
+benchmark (){
+    python benchmark.py "$@"
+}
