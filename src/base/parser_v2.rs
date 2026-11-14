@@ -11,15 +11,6 @@ where P: AsRef<Path>, {
     Ok(io::BufReader::new(file).lines())
 }
 
-pub fn read(filepath:String){
-    println!("Parsing file: {:?}", filepath);
-    if let Ok(lines) = read_lines(&filepath) {
-        for line in lines.map_while(Result::ok) {
-            println!("{}", line);
-        }
-    }
-}
-
 
 // Real parser starts here #############################################################################################
 
@@ -31,6 +22,7 @@ const DELIMITERS:[char; 3] = ['\'', ';', '"'];
 
 #[derive(Debug)]
 enum Status{
+    Ignored,
     Loop(bool),
     LoopHeader,
     Dict,
@@ -79,10 +71,16 @@ enum Current{
 }
 
 
-pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data {
-    println!("Parsing file: {filepath}");
-    println!("INCLUDE:{:?}", include); // Keys to include
-    println!("EXCLUDE:{:?}", exclude); // Keys to exclude
+pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>, verbose:bool) -> Data {
+    if verbose {
+        println!("Parsing file: {filepath}");
+        if include.len() > 0 {
+            println!("INCLUDE:{:?}", include); // Keys to include
+        }
+        if exclude.len() > 0 {
+            println!("EXCLUDE:{:?}", exclude); // Keys to exclude
+        }
+    }
     // Keys = [k for k in keys if (k in include or len(include) == 0) and k not in exclude]
 
     let re = Regex::new(r"  *").unwrap(); // Pattern to merge spaces
@@ -109,7 +107,9 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data 
             // }
             // Loop through every line in file
             // println!("");
-            //println!("[{n}] {:?}", line);
+            if verbose {
+                println!("[{n}] {:?}", line);
+            }
             let l = re.replace_all(&line, " "); // l is line with compressed spaces (and trimmed)
             let l = l.trim();
             //println!("l: {:?}", l);
@@ -170,7 +170,7 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data 
                                 '_' => {
                                     //println!("Key detected!");
                                     match status {
-                                        Status::Blank => {
+                                        Status::Blank | Status::Ignored => {
                                             // New field
                                             pending = Pending::NewField;
                                             status = Status::Dict;
@@ -241,6 +241,23 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data 
             match pending {
                 Pending::NewField => {
                     let k = l0.split(".").collect::<Vec<&str>>()[0].to_string();
+
+                    if include.len() > 0{
+                        if !include.contains(&k) {
+                            //println!("IGNORED field: {:?}", k);
+                            status = Status::Ignored;
+                            pending = Pending::None;
+                            continue
+                        }
+                    }
+                    if exclude.len() > 0{
+                        if exclude.contains(&k) {
+                            //println!("EXCLUDED field: {:?}", k);
+                            status = Status::Ignored;
+                            pending = Pending::None;
+                            continue
+                        }
+                    }
                     //println!("NEW field: {:?}", k);
                     match status {
                         Status::Dict => {current_field = Current::Field(Field{mode:String::from("dict"), key:k, subkeys:vec![], subitems:vec![]});},
@@ -499,7 +516,7 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data 
         }
     }
     //println!("\nDATA: {:?}", data);
-    println!("\nFILEPATH: {}", &filepath);
+    //println!("\nFILEPATH: {}", &filepath);
     return data; // Return parsed data
 }
 // #####################################################################################################################

@@ -30,13 +30,13 @@ mod base;
 /// Formats the sum of two numbers as string.
 #[pyfunction]
 fn print(filepath:String) -> PyResult<String> {
-    base::parser::read(filepath.clone());
+    base::parser::parse(filepath.clone(), vec![], vec![], true);
     return Ok(filepath.clone())
 }
 
 #[pyfunction]
 fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> PyResult<String> {
-    base::parser::parse(filepath.clone(), include.clone(), exclude.clone());
+    base::parser::parse(filepath.clone(), include.clone(), exclude.clone(), false);
     return Ok(filepath)
 }
 
