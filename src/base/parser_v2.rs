@@ -290,6 +290,7 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data 
                     println!("New loop item");
                     let mut vals = vec![];
                     let mut val = String::from("");
+                    let mut add_to_last = false;
 
 
                     for c in line.chars() {
@@ -317,15 +318,25 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data 
                                         Literal::None => {
                                             println!("\nInline literal start (loop): {c}");
                                             literal = Literal::Inline(cc.clone());
+                                            continue
                                         },
                                         Literal::Inline(dd) => {
                                             println!("\nInline literal (loop): {cc:?} {dd:?}");
                                             if dd == cc {
                                                 println!("Inline literal end (loop): {c}");
                                                 literal = Literal::None;
+                                                continue
                                             }
                                         },
-                                        _ => {}
+                                        Literal::Multiline(dd) => {
+                                            println!("\nMultiline literal (loop): {cc:?} {dd:?}");
+                                            if dd == cc {
+                                                println!("Multiline literal end (loop): {c}");
+                                                literal = Literal::None;
+                                                add_to_last = true;
+                                                continue
+                                            }
+                                        }
                                     }
 
                                 }
@@ -334,30 +345,49 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data 
                         }
 
                     }
+                    if val.len() > 0 {
+                        println!("\nNEW VAL (last): {:?}", val);
+                        vals.push(val.clone());
+                    }
                     match literal {
                             Literal::Inline(dd) => {
-                                println!("Inline literal unfinished -> Multiline literal");
+                                println!("\nInline literal unfinished (loop) -> Multiline literal");
                                 literal = Literal::Multiline(dd);
                                 //todo!("Multiline literals")
                             },
+                            Literal::Multiline(_) => {
+                                add_to_last = true;
+                            }
                             _ => {}
                         }
-
+                    // Update/add item (loop)
                     match current_field {
                         Current::Field(ref mut f) => {
                             println!("SUBK: {:?}", f.subkeys);
                             println!("VALS: {:?}", &vals);
                             if splitloop {
                                 // last has missing vals -> push to last item
-                                println!("Pushing to last item");
+
                                 let last_n = &f.subitems.len() - 1;
                                 let last = &mut f.subitems[last_n];
+
+                                // If there was a multiline literal then extend last value from last item
+                                if add_to_last && vals.len() > 0{
+                                    let first_val = &vals[0];
+                                    let last_val_n = last.values.len() - 1;
+                                    let last_val = last.values[last_val_n].clone();
+                                    println!("Extending to last item [{}]: {:?} + {:?}", last_val_n, last_val, first_val);
+                                    last.values[last_val_n] = last_val + first_val;
+                                    vals = vals[1..].to_vec(); // remove first val
+                                }
+
                                 //let mut last_values = last.values;
+                                println!("Pushing to last item: {:?}", vals);
                                 last.values.extend(vals);
                                 if last.values.len() == f.subkeys.len() {
                                     status = Status::Loop(false);
                                 } else if last.values.len() > f.subkeys.len() {
-                                        todo!("Too many values in loop item: N subkeys: {:?} / N vals: {:?}", f.subkeys.len(), last.values.len());
+                                    todo!("Too many values in loop item: N subkeys: {:?} / N vals: {:?}", f.subkeys.len(), last.values.len());
                                 }
 
                             } else {
@@ -382,7 +412,7 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data 
 
 
 
-            // Update subitem
+            // Update subitem (dict)
             match current_item {
                 Current::Item(ref mut i) => {
                     println!("CURRENT ITEM: {i:?}");
@@ -404,7 +434,6 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data 
                                         _ => {
                                             l1 = &line;
                                             println!("No key -> add_to_last");
-
                                             add_to_last = true;
                                         }
                                     }
@@ -426,6 +455,7 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>) -> Data 
                                             if dd == c {
                                                 println!("Inline literal end (dict): {c}");
                                                 literal = Literal::None;
+                                                continue
                                             }
                                         }
                                     }
