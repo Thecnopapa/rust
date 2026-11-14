@@ -35,7 +35,7 @@ def parse_bioiain(filepath, verbose=False):
 if __name__ == "__main__":
     log("header", "Benchmarking mmcif parsers")
     filepath = "./test-cases/1M2Z.cif"
-
+    os.makedirs("./test-output", exist_ok=True)
 
     mode = None
     if "--bioiain" in sys.argv:
