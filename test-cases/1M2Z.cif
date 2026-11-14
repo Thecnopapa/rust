@@ -1,6 +1,6 @@
 data_1M2Z
 # 
-_entry.id   1M2Z 
+_entry.id   12E1
 # 
 _audit_conform.dict_name       mmcif_pdbx.dic 
 _audit_conform.dict_version    5.389 

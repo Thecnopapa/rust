@@ -2,6 +2,7 @@ use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::Path;
 use regex::Regex;
+use std::iter::zip;
 
 
 // Misc functions ######################################################################################################
@@ -17,7 +18,7 @@ where P: AsRef<Path>, {
 const DELIMITERS:[char; 3] = ['\'', ';', '"'];
 
 
-#[derive(Debug)]
+//#[derive(Debug)]
 enum Status{
     Ignored,
     Loop(bool),
@@ -26,20 +27,20 @@ enum Status{
     Blank,
 }
 
-#[derive(Debug)]
+//#[derive(Debug)]
 enum Literal{
     Inline(char),
     Multiline(char),
     None
 }
 
-#[derive(Debug)]
+//#[derive(Debug)]
 pub struct Item {
     _n: i32,
     pub values: Vec<String>
 }
 
-#[derive(Debug)]
+//#[derive(Debug)]
 pub struct Field{
     pub mode: String,
     pub key: String,
@@ -47,20 +48,20 @@ pub struct Field{
     pub subitems: Vec<Item>
 }
 
-#[derive(Debug)]
+//#[derive(Debug)]
 pub struct Data{
     pub dataname: String,
     pub fields: Vec<Field>
 }
 
-#[derive(Debug)]
+//#[derive(Debug)]
 enum Pending{
     NewField,
     NewKey,
     None
 }
 
-#[derive(Debug)]
+//#[derive(Debug)]
 enum Current{
     Field(Field),
     Item(Item),
@@ -532,4 +533,50 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>, verbose:
     //println!("\nFILEPATH: {}", &filepath);
     return data; // Return parsed data
 }
+
+
+
+
+
+
+
+
+use std::env;
+//use std::io::{self, Write};
+use write_json;
+
+fn main() -> Result<(), ()> {
+    let args: Vec<String> = env::args().collect();
+
+    assert!(args.len() > 1, "No file provided");
+
+    let filepath = &args[1];
+    let data = parse(filepath.to_string(), vec![], vec![], false);
+    let mut buf = String::new();
+    let mut obj = write_json::object(&mut buf);
+    for field in data.fields{
+        let mut a = obj.array(&field.key);
+        match field.mode.as_str() {
+            "dict"|"loop" => {
+                for item in field.subitems{
+                    let mut o = a.object();
+                    for (k, v) in zip(field.subkeys.iter(), item.values.iter()){
+                        o.string(k, v);
+                    }
+                }
+            },
+            _ => {}
+        }
+    }
+
+    //println!("{:?}", &obj);
+
+
+    //io::stdout().write_all(b"hello world")?;
+    Ok(())
+}
+
+
+
+
 // #####################################################################################################################

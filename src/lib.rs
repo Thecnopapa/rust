@@ -1,10 +1,10 @@
 use std::iter::zip;
+use rust_decimal::Decimal;
+
 use pyo3::prelude::*;
 mod base;
 
 use pyo3::types::{PyDict, PyNone};
-//use pyo3::conversion::IntoPyObject::into_pyobject;
-//use pyo3::PyTypeInfo;
 
 // #[pyclass()]
 // struct MMCIF;
@@ -28,6 +28,7 @@ use pyo3::types::{PyDict, PyNone};
 //         Ok(())
 //     }
 // }
+
 
 
 #[pyfunction]
@@ -68,18 +69,35 @@ fn read_mmcif<'py>(py: Python<'py>, filepath:String, subset:Vec<String>, exclude
                                 continue
                             },
                             Err(..) =>{
-                                match v.parse::<f32>() {
+                                match v.parse::<bool>() {
                                     Ok(vv) => {
                                         let _ = subdict.set_item(k.to_string(), vv);
                                         continue
                                     },
                                     Err(..) =>{
-                                        match v.parse::<bool>() {
-                                            Ok(vv) => {
-                                                let _ = subdict.set_item(k.to_string(), vv);
-                                                continue
+                                        let chars:Vec<_>= v.chars().collect();
+                                        if chars.contains(&'E') | chars.contains(&'e') {
+                                            let _ = subdict.set_item(k.to_string(), v);
+                                            continue
+                                        }
+                                        match v.parse::<Decimal>() {
+                                            Ok(_) => {
+                                                match Decimal::from_str_exact(v){
+                                                    Ok(vv) => {
+                                                        let _ = subdict.set_item(k.to_string(), vv);
+                                                        continue
+                                                    },
+                                                    Err(..) => {
+                                                        let _ = subdict.set_item(k.to_string(), v);
+                                                        continue
+                                                    }
+                                                }
+                                                
                                             },
-                                            Err(..) =>{let _ = subdict.set_item(k.to_string(), v);}
+                                            Err(..) =>{
+                                                let _ = subdict.set_item(k.to_string(), v);
+                                                continue
+                                            }
                                         }
                                     }
                                 }

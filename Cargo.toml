@@ -4,8 +4,10 @@ version = "0.0.3"
 edition = "2024"
 
 [dependencies]
-pyo3 = "*"
+pyo3 = { version = "*", features = ["rust_decimal"] }
 regex = "*"
+rust_decimal = "*"
+write-json = "*"
 
 [lib]
 name = "mmcif_parser"
@@ -15,4 +17,4 @@ crate-type = ["cdylib"]
 
 [[bin]]
 name = "mmcif_parser"
-path = "src/main.rs"
+path = "src/base/parser_v2.rs"
