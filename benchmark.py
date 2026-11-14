@@ -14,6 +14,8 @@ def parse_rust(filepath, verbose=False):
     seconds = nanoseconds / 1000000000
     log(1, f"Elapsed seconds: {seconds:2.5f}")
     log(1, f"N keys: {len(data.keys())}")
+    json.dump(data, open("./test-output/rust.json", "w"), indent=4)
+
     return data
 
 def parse_bioiain(filepath, verbose=False):
@@ -26,6 +28,7 @@ def parse_bioiain(filepath, verbose=False):
     seconds = nanoseconds / 1000000000
     log(1, f"Elapsed seconds: {seconds:2.5f}")
     log(1, f"N keys: {len(data.keys())}")
+    json.dump(data, open("./test-output/bioiain.json", "w"), indent=4)
     return data
 
 

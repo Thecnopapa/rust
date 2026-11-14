@@ -41,14 +41,16 @@ fn read_mmcif<'py>(py: Python<'py>, filepath:String, subset:Vec<String>, exclude
         match field.mode.as_str() {
             "dict"|"loop" => {
                 let key: Bound<'py, PyString> = PyString::new(py, &field.key);
-                let mut items: Vec<(String, String)> = vec![];
+                let mut items: Vec<Bound<'_, PyDict>> = vec![];
                 //let obj = Bound<'py, PyObject> = PyObject::from((key, items));
                 for item in field.subitems{
+                    let mut subdict = PyDict::new(py);
                     for (k, v) in zip(field.subkeys.iter(), item.values.iter()){
-                        items.push((k.to_string(), v.to_string()));
+                        subdict.set_item(k.to_string(), v.to_string());
                     }
+                    items.push(subdict);
                 }
-                dict.set_item::<&String, Vec<(String, String)>>(&field.key, items);
+                dict.set_item::<&String, Vec<Bound<'_, PyDict>>>(&field.key, items);
             },
             _ => {}
         }
