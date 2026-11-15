@@ -73,10 +73,12 @@ enum Current{
 pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>, verbose:bool) -> Data {
     let mut include = include.clone();
     let mut had_include = false;
+    if include.len() > 0 {
+        had_include = true;
+    }
     if verbose {
         println!("Parsing file: {filepath}");
         if include.len() > 0 {
-            had_include = true;
             println!("INCLUDE:{:?}", include); // Keys to include
         }
         if exclude.len() > 0 {
@@ -108,7 +110,7 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>, verbose:
             //     break
             // }
             // Loop through every line in file
-            // println!("");
+            //println!("");
             if verbose {
                 println!("[{n}] {:?}", line);
             }
@@ -247,31 +249,34 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>, verbose:
             match pending {
                 Pending::NewField => {
                     let k = l0.split(".").collect::<Vec<&str>>()[0].to_string();
-
+                    let mut allowed = true;
+                    //println!("{:?}", had_include );
                     if had_include {
+                        allowed = false;
                         for (i, ival) in include.iter().enumerate(){
                             if ival == &k {
-                                //println!("IGNORED field: {:?}", k);
+                                allowed = true;
                                 include.remove(i);
-                                status = Status::Ignored;
-                                pending = Pending::None;
                                 break
                             }
                         }
-                        match status {
-                            Status::Ignored => {continue},
-                            _ => {}
+                    }
+                    if allowed{
+                        if exclude.len() > 0{
+                            if exclude.contains(&k) {
+                                allowed = false;
+                            }
                         }
                     }
 
-                    if exclude.len() > 0{
-                        if exclude.contains(&k) {
-                            //println!("EXCLUDED field: {:?}", k);
-                            status = Status::Ignored;
-                            pending = Pending::None;
-                            continue
-                        }
+                    if !allowed {
+                        //println!("IGNORED field: {:?}", k);
+                        status = Status::Ignored;
+                        pending = Pending::None;
+                        continue
                     }
+                    //println!("ALLOWED field: {:?}", k);
+
                     //println!("NEW field: {:?}", k);
                     match status {
                         Status::Dict => {current_field = Current::Field(Field{mode:String::from("dict"), key:k, subkeys:vec![], subitems:vec![]});},
@@ -318,7 +323,7 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>, verbose:
                     }
                 },
                 // If loop add new subitem with values
-                Status::Loop(splitloop)=> {
+                Status::Loop(mut splitloop)=> {
                     //println!("New loop item");
                     let mut vals = vec![];
                     let mut val = String::from("");
@@ -382,16 +387,17 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>, verbose:
                         vals.push(val.clone());
                     }
                     match literal {
-                            Literal::Inline(dd) => {
-                                //println!("\nInline literal unfinished (loop) -> Multiline literal");
-                                literal = Literal::Multiline(dd);
-                                //todo!("Multiline literals")
-                            },
-                            Literal::Multiline(_) => {
-                                add_to_last = true;
-                            }
-                            _ => {}
+                        Literal::Inline(dd) => {
+                            //println!("\nInline literal unfinished (loop) -> Multiline literal");
+                            literal = Literal::Multiline(dd);
+                        },
+                        Literal::Multiline(_) => {
+                            //println!("\nInside Multiline literal");
+                            add_to_last = true;
+                            splitloop = true
                         }
+                        _ => {}
+                    }
                     // Update/add item (loop)
                     match current_field {
                         Current::Field(ref mut f) => {
@@ -404,6 +410,7 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>, verbose:
                                 let last = &mut f.subitems[last_n];
 
                                 // If there was a multiline literal then extend last value from last item
+                                //println!("{:?}/{:?}",add_to_last,  vals.len() > 0);
                                 if add_to_last && vals.len() > 0{
                                     let first_val = &vals[0];
                                     let last_val_n = last.values.len() - 1;
@@ -416,6 +423,7 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>, verbose:
                                 //let mut last_values = last.values;
                                 //println!("Pushing to last item: {:?}", vals);
                                 last.values.extend(vals);
+                                //println!("NEW values: {:?}", last.values);
                                 if last.values.len() == f.subkeys.len() {
                                     status = Status::Loop(false);
                                 } else if last.values.len() > f.subkeys.len() {
@@ -424,14 +432,20 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>, verbose:
 
                             } else {
                                 // add new item
-                                if vals.len() < f.subkeys.len() {
-                                    // if missing vals declare splitloop
-                                    //println!("Key value missmatch: N subkeys: {:?} / N vals: {:?}", f.subkeys.len(), vals.len());
-                                    status = Status::Loop(true);
-                                } else if vals.len() > f.subkeys.len() {
-                                    todo!("Too many values in loop item: N subkeys: {:?} / N vals: {:?}", f.subkeys.len(), vals.len())
+                                if vals.len() > 0{
+                                    //println!("Pushing new item: {:?}", vals);
+                                    f.subitems.push(Item{_n:current_n, values:vals});
                                 }
-                                f.subitems.push(Item{_n:current_n, values:vals});
+                            }
+                            let last_n = &f.subitems.len() - 1;
+                            //println!("FINAL VALUES {:?}", &f.subitems[last_n].values);
+                            let last_n_vals = f.subitems[last_n].values.len();
+                            if last_n_vals < f.subkeys.len() {
+                                // if missing vals declare splitloop
+                                //println!("Key value missmatch: N subkeys: {:?} / N vals: {:?}", f.subkeys.len(), last_n_vals);
+                                status = Status::Loop(true);
+                            } else if last_n_vals > f.subkeys.len() {
+                                todo!("Too many values in loop item: N subkeys: {:?} / N vals: {:?}", f.subkeys.len(), last_n_vals);
                             }
 
                         },
@@ -563,9 +577,8 @@ pub fn data_to_json(data:Data, indent:i32) -> String{
 
                         match v.parse::<i32>() { Ok(vv) => {json_string += &format!("{:?}: {},", &k, vv);continue}, _ => {}}
                         match v.parse::<bool>() { Ok(vv) => {json_string += &format!("{:?}: {},", &k, vv);continue}, _ => {}}
-                        match v.parse::<Decimal>() { Ok(_) => {json_string += &format!("{:?}: {},", &k, &v);continue}, _ => {}}
+                        match v.parse::<f32>() { Ok(_) => {json_string += &format!("{:?}: {},", &k, &v);continue}, _ => {}}
                         json_string += &format!("{:?}: {:?},", &k, &v);
-
                     }
                     json_string.pop();
                     if indent > 0{ json_string += "\n"; for _ in 0..indent*2 {json_string += " ";} }
