@@ -4,7 +4,7 @@ use rust_decimal::Decimal;
 use pyo3::prelude::*;
 mod base;
 
-use pyo3::types::{PyDict, PyNone};
+use pyo3::types::{PyDict, PyNone, PyString};
 
 // #[pyclass()]
 // struct MMCIF;
@@ -29,6 +29,16 @@ use pyo3::types::{PyDict, PyNone};
 //     }
 // }
 
+
+#[pyfunction]
+#[pyo3(name = "mmcif_to_json")]
+#[pyo3(signature = (filepath, subset=vec![], exclude=vec![], indent=4, verbose=false))]
+fn mmcif_to_json<'py>(py: Python<'py>, filepath:String, subset:Vec<String>, exclude:Vec<String>, indent:i32, verbose:bool) -> PyResult<Bound<'py, PyString>> {
+    let data = base::parser::parse(filepath.clone(), subset.clone(), exclude.clone(), verbose);
+    let json = base::parser::data_to_json(data, indent);
+    let out = PyString::new(py, &json);
+    Ok(out)
+}
 
 
 #[pyfunction]
@@ -126,6 +136,7 @@ fn read_mmcif<'py>(py: Python<'py>, filepath:String, subset:Vec<String>, exclude
 #[pymodule]
 fn mmcif_parser(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(read_mmcif, m)?)?;
+    m.add_function(wrap_pyfunction!(mmcif_to_json, m)?)?;
     //m.add_class::<MMCIF>()?;
     Ok(())
 }

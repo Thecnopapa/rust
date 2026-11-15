@@ -3,6 +3,7 @@ use std::io::{self, BufRead};
 use std::path::Path;
 use regex::Regex;
 use std::iter::zip;
+use rust_decimal::Decimal;
 
 
 // Misc functions ######################################################################################################
@@ -538,7 +539,52 @@ pub fn parse(filepath:String, include:Vec<String>, exclude:Vec<String>, verbose:
 
 
 
+pub fn data_to_json(data:Data, indent:i32) -> String{
+    let mut json_string = String::from("{");
 
+    for field in data.fields{
+        if indent > 0{ json_string += "\n"; for _ in 0..indent {json_string += " ";} }
+        json_string += &format!("{:?}", &field.key);
+        json_string += ": [";
+
+        match field.mode.as_str() {
+            "dict"|"loop" => {
+                for item in field.subitems{
+                    if indent > 0{ json_string += "\n"; for _ in 0..indent*2 {json_string += " ";} }
+                    json_string += "{";
+                    for (k, v) in zip(field.subkeys.iter(), item.values.iter()){
+                        if indent > 0{ json_string += "\n"; for _ in 0..indent*3 {json_string += " ";} }
+                        match v.chars().next() {
+                            Some(cc) => { match cc { '.' | '?' => {json_string += &format!("{:?}: null,", &k);continue}, _ => {}} },
+                            None => {json_string += &format!("{:?}: null,", &k);continue}
+                        }
+                        let chars:Vec<_>= v.chars().collect();
+                        if chars.contains(&'E') | chars.contains(&'e') {json_string += &format!("{:?}: {:?},", &k, &v);continue}
+
+                        match v.parse::<i32>() { Ok(vv) => {json_string += &format!("{:?}: {},", &k, vv);continue}, _ => {}}
+                        match v.parse::<bool>() { Ok(vv) => {json_string += &format!("{:?}: {},", &k, vv);continue}, _ => {}}
+                        match v.parse::<Decimal>() { Ok(_) => {json_string += &format!("{:?}: {},", &k, &v);continue}, _ => {}}
+                        json_string += &format!("{:?}: {:?},", &k, &v);
+
+                    }
+                    json_string.pop();
+                    if indent > 0{ json_string += "\n"; for _ in 0..indent*2 {json_string += " ";} }
+                    json_string += "},";
+                }
+                json_string.pop();
+            },
+            _ => {}
+        }
+        if indent > 0{ json_string += "\n"; for _ in 0..indent {json_string += " ";} }
+        json_string += "],";
+    }
+    json_string.pop();
+    if indent > 0{ json_string += "\n";}
+    json_string.push('}');
+
+    return json_string
+
+}
 
 
 use std::env;
